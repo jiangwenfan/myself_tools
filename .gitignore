@@ -1,6 +1,7 @@
 handle_result/*.txt
-utils/__pycache__/
+lib/__pycache__
 test.py
-*.txt
+mini_habits.txt
+urls.txt
 .DS_Store
 data/stardict.db
