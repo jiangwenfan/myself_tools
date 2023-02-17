@@ -5,5 +5,3 @@ mini_habits.txt
 urls.txt
 .DS_Store
 data/stardict.db
-data/test.txt
-stardict.db
