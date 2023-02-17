@@ -2,7 +2,7 @@ import logging
 import os
 from collections import Counter
 
-from utils import language
+from lib import language
 
 logging.basicConfig(level=logging.DEBUG)
 

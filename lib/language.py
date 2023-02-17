@@ -2,6 +2,11 @@ import logging
 import os
 import re
 from collections import Counter
+import asyncio
+import threading
+from concurrent.futures import ThreadPoolExecutor,as_completed,Future
+import requests
+import sqlite3
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -16,6 +21,22 @@ def get_all_invalid_unique_characters(file_name: str = "invalid_words.txt") -> l
     """
     # check
 
+    # append,无意义字符
+    # def exists_word(word: str) -> bool:
+    #     """Whether it is a word or not"""
+    #     connect = sqlite3.connect("stardict.db")
+    #     cursor = connect.cursor()
+    #     sql: str = f"select word,sw from stardict where sw='{word}'"
+    #     cursor.execute(sql)
+    #     data = cursor.fetchall()
+    #     cursor.close()
+    #     connect.cursor()
+    #     if len(data) == 0:
+    #         return False
+    #     else:
+    #         return True
+
+    #
     file_name = os.path.join(os.getcwd(),"utils",file_name)
     logging.debug(f"{file_name}")
     # read
@@ -187,10 +208,156 @@ def write_words(words: list,file_name: str,level: int = 0) -> None:
     else:
         all_words_info: list[tuple["str",int]]= words_info.most_common(level)
     all_words = [word_info[0] for word_info in all_words_info]
-    with open(file_name,"w") as f:
+    with open(file_name,"w",encoding="utf8") as f:
         f.write("\n".join(all_words))
     
 
+def get_all_urls(file_name: str = "urls.txt") -> list:
+    """_summary_
+
+    Args:
+        file_name (str): _description_
+
+    Returns:
+        list: _description_
+    """
+    # check
+
+    file_path = os.path.join(os.getcwd(),"files","urls.txt")
+    with open(file_path,'r') as f:
+        all_urls = [url.strip("\n") for url in f.readlines()]
+    return all_urls
+
+
+def get_all_valid_words_page(urls: list) -> list[str]:
+    """return words length greater than 1 and really is word"""
+    all_res = {}
+
+    def get_page_words(url: str) -> tuple(str,list):
+        """get valid characters
+
+        Args:
+            url (str): _description_
+            list (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        response = requests.get(url)
+        if response.status_code != 200:
+            logging.error(f"get page fail {response.status_code} : {url}")
+            return []
+        words_repetition_list = re.findall("[a-zA-Z]+", response.text)
+        return url,words_repetition_list
+    
+    def handle_response(response: Future):
+        url, words: list = response.result()
+        all_res[url] = words
+        # words_list = list(set(words_repetition_list))
+        # words_more_list = [res for res in words_list if len(res) > 1]
+
+
+    # create threading pool
+    pool = ThreadPoolExecutor(max_workers=3)
+    for url in urls:
+        task: Future = pool.submit(get_page_words,url)
+        task.add_done_callback(handle_response)
+    
+    
+    return all_res
+        
+
+def calculate_valid_words(valid: list,invalid: list[list,list]) -> list:
+    """calculate valid data,remove all invalid res
+
+    Args:
+        valid (list): _description_
+        invalid (list[list,list]): _description_
+
+    Returns:
+        list: _description_
+    """
+    pass
+
+def get_len_2():
+    # 区分 长度为2 和 大于2的
+    # words_2_set = set()
+    # words_more_set = set()
+    # for word in words_readlly_set:
+    #     if len(word) == 2:
+    #         words_2_set.add(word)
+    #     else:
+    #         words_more_set.add(word)
+    pass
+def write_length():
+    # 写入danci长度为2的
+    with open("words_2.txt", 'a', encoding="utf8") as f:
+        f.write("\n".join(words_2_set))
+
+    # 给单词长度超过2的排序 安装长度排序排序
+    words_more_list = list(words_more_set)
+    for index in range(len(words_more_list)):
+        for index in range(len(words_more_list)):
+            if index + 1 < len(words_more_list) and len(words_more_list[index]) < len(words_more_list[index + 1]):
+                words_more_list[index], words_more_list[index + 1] = words_more_list[index + 1], words_more_list[index]
+
+    return words_more_list
+
+
+def judge_word(word: str) -> bool:
+    """
+    判断单词是不是首字母大写。
+
+    Dog True
+    dog False
+    DoG False
+
+    re.findall("[A-Z][a-z]+","Dog")
+    ['Dog']
+    re.findall("[A-Z][a-z]+","dog")
+    []
+    re.findall("[A-Z][a-z]+","DoG")
+    ['Do']
+    re.findall("[A-Z][a-z]+","DoG-Dog")
+    ['Do', 'Dog']
+    """
+    res: list = re.findall("[A-Z][a-z]+",word)
+    if len(res) ==1 and len(res[0]) == len(word):
+        return True
+    return False
+
+
+
+def delete_local_words(words_list: list[str]) -> list[str]:
+    """去除本地单词 locl_*.txt"""
+    # 获取local_**.txt的文件
+    local_file_list = [file for file in os.listdir() if file.split(".")[-1] == "txt" and file.split("_")[0] == "local"]
+    if len(local_file_list) == 0:
+        return words_list
+    all_local_words: list = []
+    for file in local_file_list:
+        with open(file,'r',encoding="utf8") as f:
+            words = f.readlines()
+        all_local_words.extend(words)
+    all_local_words = [word.rstrip("\n") for word in words]
+
+    # 处理为中间形态进行比较。 凡是首字母大写的都转为小写
+    compare_all_local_words = []
+    for word in all_local_words:
+        if judge_word(word):
+            word = word.lower()
+        compare_all_local_words.append(word)
+
+    compare_online_words = []
+    for word in words_list:
+        if judge_word(word):
+            word = word.lower()
+        compare_online_words.append(word)
+
+    print("local: ",compare_all_local_words)
+    print("get: ",compare_online_words)
+    res: set = set(compare_online_words) - set(compare_all_local_words)
+    return list(res)
 
 # demo
 # words = get_all_valid_words("./test_res/test.txt")

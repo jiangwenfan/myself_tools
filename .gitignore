@@ -1,2 +1,5 @@
-res/*.txt
+handle_result/*.txt
 utils/__pycache__/
+test.py
+*.txt
+.DS_Store
